@@ -33,6 +33,8 @@ int main(int argc, char **argv)
     const int mode = atoi(argv[1]);
     const int threads = atoi(argv[2]);
 
+    omp_set_num_threads(threads);
+
     int width, height, channels;
     unsigned char *img = stbi_load("./resource/parrot.png", &width, &height, &channels, 4);
 
