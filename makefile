@@ -47,17 +47,17 @@ serial: $(OUT_DIR)/$(TARGET)
 	@echo -e "$(GREEN)[Serial Run]$(RESET)"
 	$(MPI) 1 ./$(OUT_DIR)/$(TARGET) 0 1
 
-omp: $(TARGET)
+omp: $(OUT_DIR)/$(TARGET)
 	@echo -e "$(GREEN)[OpenMP Run]$(RESET)"
 	$(MPI) 1 ./$(OUT_DIR)/$(TARGET) 1 4
 
-mpi: $(TARGET)
+mpi: $(OUT_DIR)/$(TARGET)
 	@echo -e "$(GREEN)[MPI Run]$(RESET)"
 	$(MPI) 4 ./$(OUT_DIR)/$(TARGET) 2 1
 
-memcheck: $(TARGET)
+leaks: $(OUT_DIR)/$(TARGET)
 	@echo -e "$(BLUE)[Memcheck]$(RESET) Verifying cleanup."
-	@valgrind --leak-check=full --show-leak-kinds=all -s $(MPI) 1 ./$(OUT_DIR)/$(TARGET) 1
+	$(MPI) 1 valgrind --leak-check=full --show-leak-kinds=all -s ./$(OUT_DIR)/$(TARGET) 0 1
 
 # Clean target
 clean:
@@ -65,4 +65,4 @@ clean:
 	@rm -rf $(BUILD_DIR)
 
 
-.PHONY: all clean format test readv memcheck
+.PHONY: all clean serial omp mpi leaks
