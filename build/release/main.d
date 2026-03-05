@@ -1,0 +1,5 @@
+build/release/./main.o: main.c src/stb_image.h src/stb_image_write.h \
+ src/serial.h
+src/stb_image.h:
+src/stb_image_write.h:
+src/serial.h:
