@@ -20,6 +20,13 @@ void omp_grayscale(unsigned char *const img, unsigned char *const gray_img, cons
 void omp_gaussian_blur(unsigned char *const in, unsigned char *out, int w, int h);
 void omp_edge_detect(unsigned char *const in, unsigned char *out, const int width, const int height);
 
+struct Image
+{
+    int width;
+    int height;
+    int channels;
+};
+
 int main(int argc, char **argv)
 {
     MPI_Init(&argc, &argv);
@@ -41,8 +48,27 @@ int main(int argc, char **argv)
 
     omp_set_num_threads(threads);
 
-    int width, height, channels;
-    unsigned char *img = stbi_load("./resource/parrot.png", &width, &height, &channels, 4);
+    unsigned char *img = NULL;
+    struct Image metadata;
+
+    // Creating custom datatype to send image metadata in one go to prevent
+    MPI_Datatype typesig[3] = {MPI_INT, MPI_INT, MPI_INT};
+    int block_lengths[3] = {1, 1, 1};
+    MPI_Aint displacements[3];
+    MPI_Get_address(&metadata.width, &displacements[0]);
+    MPI_Get_address(&metadata.height, &displacements[1]);
+    MPI_Get_address(&metadata.channels, &displacements[2]);
+
+    MPI_Datatype MPI_IMG;
+    MPI_Type_create_struct(2, block_lengths, displacements, typesig, &MPI_IMG);
+    MPI_Type_commit(&MPI_IMG);
+
+    if (rank == 0)
+    {
+        img = stbi_load("./resource/parrot.png", &metadata.width, &metadata.height, &metadata.channels, 4);
+    }
+
+    MPI_Bcast(&metadata, 1, MPI_IMG, 0, MPI_COMM_WORLD);
 
     if (img == NULL)
     {
@@ -51,9 +77,9 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    size_t img_size = (size_t)width * height * 4;
+    size_t img_size = (size_t)metadata.width * metadata.height * 4;
 
-    size_t gray_size = (size_t)width * height;
+    size_t gray_size = (size_t)metadata.width * metadata.height;
     unsigned char *gray_img = (unsigned char *)calloc(gray_size, sizeof(unsigned char));
 
     if (gray_img == NULL)
@@ -94,27 +120,27 @@ int main(int argc, char **argv)
         // 1. Sync all MPI processes before starting
         MPI_Barrier(MPI_COMM_WORLD);
         start_time = MPI_Wtime();
-        serial_grayscale(img, gray_img, height, width);
+        serial_grayscale(img, gray_img, metadata.height, metadata.width);
         MPI_Barrier(MPI_COMM_WORLD);
         gray_time = MPI_Wtime();
         glocal_elapsed = gray_time - start_time;
-        stbi_write_png("./resource/gray_serial.png", width, height, 1, gray_img, width);
+        stbi_write_png("./resource/gray_serial.png", metadata.width, metadata.height, 1, gray_img, metadata.width);
 
         MPI_Barrier(MPI_COMM_WORLD);
         start_time = MPI_Wtime();
-        serial_gaussian_blur(gray_img, blur_img, width, height);
+        serial_gaussian_blur(gray_img, blur_img, metadata.width, metadata.height);
         MPI_Barrier(MPI_COMM_WORLD);
         blur_time = MPI_Wtime();
         blocal_elapsed = blur_time - start_time;
-        stbi_write_png("./resource/blur_serial.png", width, height, 1, blur_img, width);
+        stbi_write_png("./resource/blur_serial.png", metadata.width, metadata.height, 1, blur_img, metadata.width);
 
         MPI_Barrier(MPI_COMM_WORLD);
         start_time = MPI_Wtime();
-        serial_edge_detect(blur_img, edge_img, width, height);
+        serial_edge_detect(blur_img, edge_img, metadata.width, metadata.height);
         MPI_Barrier(MPI_COMM_WORLD);
         edge_time = MPI_Wtime();
         elocal_elapsed = edge_time - start_time;
-        stbi_write_png("./resource/edge_serial.png", width, height, 1, edge_img, width);
+        stbi_write_png("./resource/edge_serial.png", metadata.width, metadata.height, 1, edge_img, metadata.width);
 
         if (rank == 0)
             printf("\n|============ SERIAL ============|\n");
@@ -123,11 +149,11 @@ int main(int argc, char **argv)
     case 1:
         MPI_Barrier(MPI_COMM_WORLD);
         start_time = MPI_Wtime();
-        omp_grayscale(img, gray_img, height, width);
+        omp_grayscale(img, gray_img, metadata.height, metadata.width);
         MPI_Barrier(MPI_COMM_WORLD);
         gray_time = MPI_Wtime();
         glocal_elapsed = gray_time - start_time;
-        stbi_write_png("./resource/gray_omp.png", width, height, 1, gray_img, width);
+        stbi_write_png("./resource/gray_omp.png", metadata.width, metadata.height, 1, gray_img, metadata.width);
 
         if (rank == 0)
             printf("\n|============ OPEN-MP ============|\n");

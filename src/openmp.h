@@ -12,7 +12,7 @@ void omp_grayscale(unsigned char *const img, unsigned char *const gray_img, cons
      * collapse(n) - loops collapsed into one large iteration space and divided according to the
      *  schedule at image is accessed a 1D array
      */
-#pragma omp parallel for default(none) shared(img, gray_img, height, width) collapse(2)
+#pragma omp parallel for default(none) shared(img, gray_img, height, width) collapse(2) schedule(static)
     for (int y = 0; y < height; y++)
     {
         for (int x = 0; x < width; x++)
