@@ -142,7 +142,7 @@ int main(int argc, char **argv)
         break;
 
     case 1:
-       blocal_elapsed = 0.0;
+        blocal_elapsed = 0.0;
         elocal_elapsed = 0.0;
         MPI_Barrier(MPI_COMM_WORLD);
         start_time = MPI_Wtime();

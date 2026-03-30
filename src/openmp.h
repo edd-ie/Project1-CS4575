@@ -76,6 +76,7 @@ void omp_gaussian_blur(unsigned char *const in, unsigned char *out, int w, int h
 
 void omp_edge_detect(unsigned char *const in, unsigned char *out, const int width, const int height)
 {
+    
     // 3x3 Laplacian Kernel
     static const int kernel[3][3] = {
         {0, 1, 0},
@@ -89,6 +90,7 @@ void omp_edge_detect(unsigned char *const in, unsigned char *out, const int widt
      * collapse(n) - loops collapsed into one large iteration space and divided according to the
      *  schedule at image is accessed a 1D array
      */
+
     #pragma omp parallel for default(none) shared(in,out, width, height, kernel) collapse(2) schedule(static)
     for (int y = 1; y < height - 1; y++)
     {
