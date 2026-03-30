@@ -21,7 +21,7 @@ void omp_grayscale(unsigned char *const img, unsigned char *const gray_img, cons
 void omp_gaussian_blur(unsigned char *const in, unsigned char *out, int w, int h);
 void omp_edge_detect(unsigned char *const in, unsigned char *out, const int width, const int height);
 
-void mpi_grayscale(unsigned char *const img, unsigned char *const gray_img, const int height, const int width);
+void mpi_grayscale(unsigned char *const img, unsigned char *const gray_img, const int height, const int width, const int size, const int rank);
 void mpi_gaussian_blur(unsigned char *const in, unsigned char *out, int w, int h);
 void mpi_edge_detect(unsigned char *const in, unsigned char *out, const int width, const int height);
 
@@ -60,6 +60,7 @@ int main(int argc, char **argv)
     unsigned char *blur_img = NULL;
     unsigned char *edge_img = NULL;
 
+    // Isolating memory allocation to only the host process
     if (rank == 0)
     {
         img = stbi_load("./resource/parrot.png", &metadata.width, &metadata.height, &metadata.channels, 4);
@@ -95,15 +96,36 @@ int main(int argc, char **argv)
 
         edge_size = blur_size;
         edge_img = calloc(edge_size, sizeof(unsigned char));
+        if (edge_img == NULL)
+        {
+            stbi_image_free(img);
+            free(gray_img);
+            free(blur_img);
+            MPI_Finalize();
+            return 1;
+        }
     }
 
-        if (edge_img == NULL)
+    if (mode == 2)
     {
-        stbi_image_free(img);
-        free(gray_img);
-        free(blur_img);
-        MPI_Finalize();
-        return 1;
+        int dims[3];
+        if (rank == 0)
+        {
+            dims[0] = metadata.width;
+            dims[1] = metadata.height;
+            dims[2] = metadata.channels;
+        }
+
+        MPI_Bcast(dims, 3, MPI_INT, 0, MPI_COMM_WORLD);
+
+        if (rank != 0)
+        {
+            metadata.width = dims[0];
+            metadata.height = dims[1];
+            metadata.channels = dims[2];
+        }
+        printf("Broadcast done: rank %d\n", rank);
+        fflush(stdout);
     }
 
     double start_time, gray_time, blur_time, edge_time;
@@ -183,14 +205,20 @@ int main(int argc, char **argv)
 
         MPI_Barrier(MPI_COMM_WORLD);
         start_time = MPI_Wtime();
-        mpi_grayscale(img, gray_img, metadata.height, metadata.width);
+
+        mpi_grayscale(img, gray_img, metadata.height, metadata.width, size, rank);
+
         MPI_Barrier(MPI_COMM_WORLD);
         gray_time = MPI_Wtime();
         glocal_elapsed = gray_time - start_time;
-        stbi_write_png("./resource/gray_omp.png", metadata.width, metadata.height, 1, gray_img, metadata.width);
+        if (rank == 0)
+            stbi_write_png("./resource/gray_mpi.png", metadata.width, metadata.height, 1, gray_img, metadata.width);
 
         if (rank == 0)
+        {
             printf("\n|============ MPI ============|\n");
+            fflush(stdout);
+        }
         break;
 
     default:
