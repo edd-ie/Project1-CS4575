@@ -11,6 +11,7 @@
 
 #include "./src/serial.h"
 #include "./src/openmp.h"
+#include "./src/ompi.h"
 
 void serial_grayscale(unsigned char *const img, unsigned char *const gray_img, const int height, const int width);
 void serial_gaussian_blur(unsigned char *const in, unsigned char *out, int w, int h);
@@ -19,6 +20,10 @@ void serial_edge_detect(unsigned char *const in, unsigned char *out, int w, int 
 void omp_grayscale(unsigned char *const img, unsigned char *const gray_img, const int height, const int width);
 void omp_gaussian_blur(unsigned char *const in, unsigned char *out, int w, int h);
 void omp_edge_detect(unsigned char *const in, unsigned char *out, const int width, const int height);
+
+void mpi_grayscale(unsigned char *const img, unsigned char *const gray_img, const int height, const int width);
+void mpi_gaussian_blur(unsigned char *const in, unsigned char *out, int w, int h);
+void mpi_edge_detect(unsigned char *const in, unsigned char *out, const int width, const int height);
 
 struct Image
 {
@@ -51,7 +56,8 @@ int main(int argc, char **argv)
     unsigned char *img = NULL;
     struct Image metadata;
 
-    // Creating custom datatype to send image metadata in one go to prevent
+    // Creating custom datatype to send image metadata in one go
+    // To prevent The overhead associated with each message
     MPI_Datatype typesig[3] = {MPI_INT, MPI_INT, MPI_INT};
     int block_lengths[3] = {1, 1, 1};
     MPI_Aint displacements[3];
@@ -153,13 +159,23 @@ int main(int argc, char **argv)
         MPI_Barrier(MPI_COMM_WORLD);
         gray_time = MPI_Wtime();
         glocal_elapsed = gray_time - start_time;
-        stbi_write_png("./resource/gray_omp.png", metadata.width, metadata.height, 1, gray_img, metadata.width);
+
+        if (rank == 0)
+            stbi_write_png("./resource/gray_omp.png", metadata.width, metadata.height, 1, gray_img, metadata.width);
 
         if (rank == 0)
             printf("\n|============ OPEN-MP ============|\n");
         break;
 
     case 2:
+
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
+        mpi_grayscale(img, gray_img, metadata.height, metadata.width);
+        MPI_Barrier(MPI_COMM_WORLD);
+        gray_time = MPI_Wtime();
+        glocal_elapsed = gray_time - start_time;
+        stbi_write_png("./resource/gray_omp.png", metadata.width, metadata.height, 1, gray_img, metadata.width);
 
         if (rank == 0)
             printf("\n|============ MPI ============|\n");
