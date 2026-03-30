@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <omp.h>
 #include <mpi.h>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -11,10 +10,15 @@
 #include "./src/stb_image_write.h"
 
 #include "./src/serial.h"
+#include "./src/openmp.h"
 
 void serial_grayscale(unsigned char *const img, unsigned char *const gray_img, const int height, const int width);
 void serial_gaussian_blur(unsigned char *const in, unsigned char *out, int w, int h);
 void serial_edge_detect(unsigned char *const in, unsigned char *out, int w, int h);
+
+void omp_grayscale(unsigned char *const img, unsigned char *const gray_img, const int height, const int width);
+void omp_gaussian_blur(unsigned char *const in, unsigned char *out, int w, int h);
+void omp_edge_detect(unsigned char *const in, unsigned char *out, const int width, const int height);
 
 int main(int argc, char **argv)
 {
@@ -81,21 +85,70 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    double start_time, gray_time, blur_time, edge_time;
+    double glocal_elapsed, blocal_elapsed, elocal_elapsed, gmax_elapsed, bmax_elapsed, emax_elapsed;
+
     switch (mode)
     {
     case 0:
+        // 1. Sync all MPI processes before starting
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
         serial_grayscale(img, gray_img, height, width);
+        MPI_Barrier(MPI_COMM_WORLD);
+        gray_time = MPI_Wtime();
+        glocal_elapsed = gray_time - start_time;
         stbi_write_png("./resource/gray_serial.png", width, height, 1, gray_img, width);
 
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
         serial_gaussian_blur(gray_img, blur_img, width, height);
+        MPI_Barrier(MPI_COMM_WORLD);
+        blur_time = MPI_Wtime();
+        blocal_elapsed = blur_time - start_time;
         stbi_write_png("./resource/blur_serial.png", width, height, 1, blur_img, width);
 
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
         serial_edge_detect(blur_img, edge_img, width, height);
+        MPI_Barrier(MPI_COMM_WORLD);
+        edge_time = MPI_Wtime();
+        elocal_elapsed = edge_time - start_time;
         stbi_write_png("./resource/edge_serial.png", width, height, 1, edge_img, width);
+
+        if (rank == 0)
+            printf("\n|============ SERIAL ============|\n");
+        break;
+
+    case 1:
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
+        omp_grayscale(img, gray_img, height, width);
+        MPI_Barrier(MPI_COMM_WORLD);
+        gray_time = MPI_Wtime();
+        glocal_elapsed = gray_time - start_time;
+        stbi_write_png("./resource/gray_omp.png", width, height, 1, gray_img, width);
+
+        if (rank == 0)
+            printf("\n|============ OPEN-MP ============|\n");
+        break;
+
+    case 2:
+
+        if (rank == 0)
+            printf("\n|============ MPI ============|\n");
         break;
 
     default:
         break;
+    }
+
+    // Find the 'bottleneck' time (the slowest process)
+    MPI_Reduce(&glocal_elapsed, &gmax_elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+    if (rank == 0)
+    {
+        printf("Grayscale runtime: %f seconds\n", gmax_elapsed);
     }
 
     stbi_image_free(img);
