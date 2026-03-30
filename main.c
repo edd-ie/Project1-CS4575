@@ -55,60 +55,49 @@ int main(int argc, char **argv)
 
     unsigned char *img = NULL;
     struct Image metadata;
-
-    // Creating custom datatype to send image metadata in one go
-    // To prevent The overhead associated with each message
-    MPI_Datatype typesig[3] = {MPI_INT, MPI_INT, MPI_INT};
-    int block_lengths[3] = {1, 1, 1};
-    MPI_Aint displacements[3];
-    MPI_Get_address(&metadata.width, &displacements[0]);
-    MPI_Get_address(&metadata.height, &displacements[1]);
-    MPI_Get_address(&metadata.channels, &displacements[2]);
-
-    MPI_Datatype MPI_IMG;
-    MPI_Type_create_struct(2, block_lengths, displacements, typesig, &MPI_IMG);
-    MPI_Type_commit(&MPI_IMG);
+    size_t img_size, gray_size, blur_size, edge_size;
+    unsigned char *gray_img = NULL;
+    unsigned char *blur_img = NULL;
+    unsigned char *edge_img = NULL;
 
     if (rank == 0)
     {
         img = stbi_load("./resource/parrot.png", &metadata.width, &metadata.height, &metadata.channels, 4);
+
+        if (img == NULL)
+        {
+            printf("Error in loading the image\n");
+            MPI_Finalize();
+            return 1;
+        }
+
+        img_size = (size_t)metadata.width * metadata.height * 4;
+
+        gray_size = (size_t)metadata.width * metadata.height;
+        gray_img = (unsigned char *)calloc(gray_size, sizeof(unsigned char));
+
+        if (gray_img == NULL)
+        {
+            stbi_image_free(img);
+            MPI_Finalize();
+            return 1;
+        }
+
+        blur_size = gray_size;
+        blur_img = (unsigned char *)calloc(blur_size, sizeof(unsigned char));
+        if (blur_img == NULL)
+        {
+            stbi_image_free(img);
+            free(gray_img);
+            MPI_Finalize();
+            return 1;
+        }
+
+        edge_size = blur_size;
+        edge_img = calloc(edge_size, sizeof(unsigned char));
     }
 
-    MPI_Bcast(&metadata, 1, MPI_IMG, 0, MPI_COMM_WORLD);
-
-    if (img == NULL)
-    {
-        printf("Error in loading the image\n");
-        MPI_Finalize();
-        return 1;
-    }
-
-    size_t img_size = (size_t)metadata.width * metadata.height * 4;
-
-    size_t gray_size = (size_t)metadata.width * metadata.height;
-    unsigned char *gray_img = (unsigned char *)calloc(gray_size, sizeof(unsigned char));
-
-    if (gray_img == NULL)
-    {
-        stbi_image_free(img);
-        MPI_Finalize();
-        return 1;
-    }
-
-    size_t blur_size = gray_size;
-    unsigned char *blur_img = (unsigned char *)calloc(blur_size, sizeof(unsigned char));
-    if (blur_img == NULL)
-    {
-        stbi_image_free(img);
-        free(gray_img);
-        MPI_Finalize();
-        return 1;
-    }
-
-    size_t edge_size = blur_size;
-    unsigned char *edge_img = calloc(edge_size, sizeof(unsigned char));
-
-    if (edge_img == NULL)
+        if (edge_img == NULL)
     {
         stbi_image_free(img);
         free(gray_img);
