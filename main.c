@@ -142,6 +142,8 @@ int main(int argc, char **argv)
         break;
 
     case 1:
+       blocal_elapsed = 0.0;
+        elocal_elapsed = 0.0;
         MPI_Barrier(MPI_COMM_WORLD);
         start_time = MPI_Wtime();
         omp_grayscale(img, gray_img, metadata.height, metadata.width);
@@ -151,6 +153,27 @@ int main(int argc, char **argv)
 
         if (rank == 0)
             stbi_write_png("./resource/gray_omp.png", metadata.width, metadata.height, 1, gray_img, metadata.width);
+
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
+        omp_gaussian_blur(gray_img, blur_img, metadata.width, metadata.height);
+        MPI_Barrier(MPI_COMM_WORLD);
+        blur_time = MPI_Wtime();
+        blocal_elapsed = blur_time - start_time;
+
+        if (rank == 0)
+            stbi_write_png("./resource/blur_omp.png", metadata.width, metadata.height, 1, blur_img, metadata.width);
+        
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
+        omp_edge_detect(blur_img, edge_img, metadata.width, metadata.height);
+        MPI_Barrier(MPI_COMM_WORLD);
+        edge_time = MPI_Wtime();
+        elocal_elapsed = edge_time - start_time;
+
+        if (rank == 0)
+            stbi_write_png("./resource/edge_omp.png", metadata.width, metadata.height, 1, edge_img, metadata.width);
+
 
         if (rank == 0)
             printf("\n|============ OPEN-MP ============|\n");
@@ -176,10 +199,14 @@ int main(int argc, char **argv)
 
     // Find the 'bottleneck' time (the slowest process)
     MPI_Reduce(&glocal_elapsed, &gmax_elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&blocal_elapsed, &bmax_elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&elocal_elapsed, &emax_elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
     if (rank == 0)
     {
         printf("Grayscale runtime: %f seconds\n", gmax_elapsed);
+        printf("Gaussian Blur runtime runtime: %f seconds\n", bmax_elapsed);
+        printf("Edge Detection runtime: %f seconds\n", emax_elapsed);
     }
 
     stbi_image_free(img);

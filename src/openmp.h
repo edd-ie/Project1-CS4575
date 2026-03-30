@@ -50,7 +50,7 @@ void omp_gaussian_blur(unsigned char *const in, unsigned char *out, int w, int h
      * collapse(n) - loops collapsed into one large iteration space and divided according to the
      *  schedule at image is accessed a 1D array
      */
-    #pragma omp parallel for default(none) shared(in, out, w, h) collapse(2) schedule(static)
+    #pragma omp parallel for default(none) shared(in, out, w, h, kernel) collapse(2) schedule(static)
     for (int y = 2; y < h - 2; y++)
     {
         for (int x = 2; x < w - 2; x++)
@@ -89,7 +89,7 @@ void omp_edge_detect(unsigned char *const in, unsigned char *out, const int widt
      * collapse(n) - loops collapsed into one large iteration space and divided according to the
      *  schedule at image is accessed a 1D array
      */
-    #pragma omp parallel for default(none) shared(out, width, height) collapse(2) schedule(static)
+    #pragma omp parallel for default(none) shared(in,out, width, height, kernel) collapse(2) schedule(static)
     for (int y = 1; y < height - 1; y++)
     {
         for (int x = 1; x < width - 1; x++)
