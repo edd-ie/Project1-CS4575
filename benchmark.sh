@@ -4,7 +4,7 @@
 EXE="./build/release/main"
 IMAGES=("./resource/small.png" "./resource/medium.png" "./resource/large.png" "./resource/xtra.png")
 THREADS=(1 2 4 8)
-PROCS=(1 2 4)
+PROCS=(1 2 4 6)
 OUT="results/benchmarks.csv"
 
 mkdir -p results
@@ -22,7 +22,7 @@ run_test() {
     for i in {0..4}; do
         if [ $mode -eq 2 ]; then
             # MPI Command
-            TIME=$(mpirun -np $config $EXE $mode 1 $img_path | grep "TIME" | awk '{print $2}')
+            TIME=$(mpirun -np $config --oversubscribe $EXE $mode 1 $img_path | grep "TIME" | awk '{print $2}')
         else
             # Serial or OMP Command
             TIME=$($EXE $mode $config $img_path | grep "TIME" | awk '{print $2}')
