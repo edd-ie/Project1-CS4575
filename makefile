@@ -9,6 +9,7 @@ TARGET = main
 SRC_DIRS = . src
 BUILD_DIR   := build
 RELEASE_DIR := $(BUILD_DIR)/release
+IMG = ./resource/small.png
 
 # Colours
 GREEN  := \033[1;32m
@@ -25,6 +26,8 @@ LDFLAGS   := -fopenmp
 SRCS := $(shell find $(SRC_DIRS) -maxdepth 1 -name "*.c" 2>/dev/null)
 OBJS := $(SRCS:%.c=$(OUT_DIR)/%.o)
 DEPS := $(OBJS:.o=.d)
+
+
 
 all: $(OUT_DIR)/$(TARGET)
 	@echo -e "$(GREEN)Build Complete: $(OUT_DIR)/$(TARGET)$(RESET)"
@@ -45,15 +48,15 @@ $(OUT_DIR)/%.o: %.c
 # Run target
 serial: $(OUT_DIR)/$(TARGET)
 	@echo -e "$(GREEN)[Serial Run]$(RESET)"
-	$(MPI) 1 ./$(OUT_DIR)/$(TARGET) 0 1
+	$(MPI) 1 ./$(OUT_DIR)/$(TARGET) 0 1 $(IMG)
 
 omp: $(OUT_DIR)/$(TARGET)
 	@echo -e "$(GREEN)[OpenMP Run]$(RESET)"
-	$(MPI) 1 ./$(OUT_DIR)/$(TARGET) 1 4
+	$(MPI) 1 ./$(OUT_DIR)/$(TARGET) 1 4 $(IMG)
 
 mpi: $(OUT_DIR)/$(TARGET)
 	@echo -e "$(GREEN)[MPI Run]$(RESET)"
-	$(MPI) 4 ./$(OUT_DIR)/$(TARGET) 2 1
+	$(MPI) 4 ./$(OUT_DIR)/$(TARGET) 2 1 $(IMG)
 
 leaks: $(OUT_DIR)/$(TARGET)
 	@echo -e "$(BLUE)[Memcheck]$(RESET) Verifying cleanup."
