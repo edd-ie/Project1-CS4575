@@ -23,7 +23,7 @@ void omp_edge_detect(unsigned char *const in, unsigned char *out, const int widt
 
 void mpi_grayscale(unsigned char *const img, unsigned char *const gray_img, const int height, const int width, const int size, const int rank);
 void mpi_gaussian_blur(unsigned char *in, unsigned char *out, const int height, const int width, const int size, const int rank);
-void mpi_edge_detect(unsigned char *in, unsigned char *out, const int width, const int height);
+void mpi_edge_detect(unsigned char *in, unsigned char *out, const int height, const int width, const int size, const int rank);
 
 struct Image
 {
@@ -55,7 +55,7 @@ int main(int argc, char **argv)
 
     unsigned char *img = NULL;
     struct Image metadata;
-    size_t img_size, gray_size, blur_size, edge_size;
+    size_t img_size;
     unsigned char *gray_img = NULL;
     unsigned char *blur_img = NULL;
     unsigned char *edge_img = NULL;
@@ -72,10 +72,8 @@ int main(int argc, char **argv)
             return 1;
         }
 
-        img_size = (size_t)metadata.width * metadata.height * 4;
-
-        gray_size = (size_t)metadata.width * metadata.height;
-        gray_img = (unsigned char *)calloc(gray_size, sizeof(unsigned char));
+        img_size = (size_t)metadata.width * metadata.height;
+        gray_img = (unsigned char *)calloc(img_size, sizeof(unsigned char));
 
         if (gray_img == NULL)
         {
@@ -84,8 +82,7 @@ int main(int argc, char **argv)
             return 1;
         }
 
-        blur_size = gray_size;
-        blur_img = (unsigned char *)calloc(blur_size, sizeof(unsigned char));
+        blur_img = (unsigned char *)calloc(img_size, sizeof(unsigned char));
         if (blur_img == NULL)
         {
             stbi_image_free(img);
@@ -94,8 +91,7 @@ int main(int argc, char **argv)
             return 1;
         }
 
-        edge_size = blur_size;
-        edge_img = calloc(edge_size, sizeof(unsigned char));
+        edge_img = calloc(img_size, sizeof(unsigned char));
         if (edge_img == NULL)
         {
             stbi_image_free(img);
@@ -172,6 +168,26 @@ int main(int argc, char **argv)
         if (rank == 0)
             stbi_write_png("./resource/gray_omp.png", metadata.width, metadata.height, 1, gray_img, metadata.width);
 
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
+        omp_gaussian_blur(gray_img, blur_img, metadata.width, metadata.height);
+        MPI_Barrier(MPI_COMM_WORLD);
+        blur_time = MPI_Wtime();
+        blocal_elapsed = blur_time - start_time;
+
+        if (rank == 0)
+            stbi_write_png("./resource/blur_omp.png", metadata.width, metadata.height, 1, blur_img, metadata.width);
+
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
+        omp_edge_detect(blur_img, edge_img, metadata.width, metadata.height);
+        MPI_Barrier(MPI_COMM_WORLD);
+        edge_time = MPI_Wtime();
+        elocal_elapsed = edge_time - start_time;
+
+        if (rank == 0)
+            stbi_write_png("./resource/edge_omp.png", metadata.width, metadata.height, 1, edge_img, metadata.width);
+
         if (rank == 0)
             printf("\n|============ OPEN-MP ============|\n");
         break;
@@ -195,10 +211,21 @@ int main(int argc, char **argv)
         mpi_gaussian_blur(gray_img, blur_img, metadata.height, metadata.width, size, rank);
 
         MPI_Barrier(MPI_COMM_WORLD);
-        gray_time = MPI_Wtime();
-        glocal_elapsed = gray_time - start_time;
+        blur_time = MPI_Wtime();
+        blocal_elapsed = blur_time - start_time;
         if (rank == 0)
             stbi_write_png("./resource/blur_mpi.png", metadata.width, metadata.height, 1, blur_img, metadata.width);
+
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
+
+        mpi_edge_detect(blur_img, edge_img, metadata.height, metadata.width, size, rank);
+
+        MPI_Barrier(MPI_COMM_WORLD);
+        edge_time = MPI_Wtime();
+        elocal_elapsed = edge_time - start_time;
+        if (rank == 0)
+            stbi_write_png("./resource/edge_mpi.png", metadata.width, metadata.height, 1, edge_img, metadata.width);
 
         if (rank == 0)
         {
@@ -213,11 +240,14 @@ int main(int argc, char **argv)
 
     // Find the 'bottleneck' time (the slowest process)
     MPI_Reduce(&glocal_elapsed, &gmax_elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&blocal_elapsed, &bmax_elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&elocal_elapsed, &emax_elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
     if (rank == 0)
     {
         printf("Grayscale runtime: %f seconds\n", gmax_elapsed);
-        fflush(stdout);
+        printf("Gaussian Blur runtime runtime: %f seconds\n", bmax_elapsed);
+        printf("Edge Detection runtime: %f seconds\n", emax_elapsed);
     }
 
     stbi_image_free(img);
