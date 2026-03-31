@@ -22,8 +22,8 @@ void omp_gaussian_blur(unsigned char *const in, unsigned char *out, int w, int h
 void omp_edge_detect(unsigned char *const in, unsigned char *out, const int width, const int height);
 
 void mpi_grayscale(unsigned char *const img, unsigned char *const gray_img, const int height, const int width, const int size, const int rank);
-void mpi_gaussian_blur(unsigned char *const in, unsigned char *out, int w, int h);
-void mpi_edge_detect(unsigned char *const in, unsigned char *out, const int width, const int height);
+void mpi_gaussian_blur(unsigned char *in, unsigned char *out, const int height, const int width, const int size, const int rank);
+void mpi_edge_detect(unsigned char *in, unsigned char *out, const int width, const int height);
 
 struct Image
 {
@@ -124,8 +124,6 @@ int main(int argc, char **argv)
             metadata.height = dims[1];
             metadata.channels = dims[2];
         }
-        printf("Broadcast done: rank %d\n", rank);
-        fflush(stdout);
     }
 
     double start_time, gray_time, blur_time, edge_time;
@@ -190,6 +188,17 @@ int main(int argc, char **argv)
         glocal_elapsed = gray_time - start_time;
         if (rank == 0)
             stbi_write_png("./resource/gray_mpi.png", metadata.width, metadata.height, 1, gray_img, metadata.width);
+
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
+
+        mpi_gaussian_blur(gray_img, blur_img, metadata.height, metadata.width, size, rank);
+
+        MPI_Barrier(MPI_COMM_WORLD);
+        gray_time = MPI_Wtime();
+        glocal_elapsed = gray_time - start_time;
+        if (rank == 0)
+            stbi_write_png("./resource/blur_mpi.png", metadata.width, metadata.height, 1, blur_img, metadata.width);
 
         if (rank == 0)
         {
