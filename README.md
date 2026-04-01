@@ -1,7 +1,9 @@
 # Parallel Image Processing Tool
 
 **Student Names:** Eddie Ogendo & Jared Howse
+
 **Course:** CS4574/CS6025 Parallel Computing
+
 **Theme:** Theme A (Image Project)
 
 ---
