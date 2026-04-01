@@ -124,7 +124,7 @@ Parameters example:
 - `1`: Sets the `OpenMP` thread count to 1.
 
 ### Benchmarking Script
-This program also utilizes a Bash automation script which gives all results for serial implementation, openMP 1,2,4 and 8 threads, and MPI 1, 2, 4, and 6 processes. The script averages 5 runs after duscarding the first.
+This program also utilizes a Bash automation script which gives all results for serial implementation, openMP 1,2,4 and 8 threads, and MPI 1, 2, 4, and 6 processes. The script averages 5 runs after discarding the first.
 
 To run the script first make sure its executable use the following command:
 
